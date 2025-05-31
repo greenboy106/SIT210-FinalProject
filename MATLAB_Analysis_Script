@@ -1,0 +1,70 @@
+% === Configuration ===
+readChannelID = 2976712;
+readAPIKey = '9KBEI276HF3QMY44';
+iftttKey = 'cgn2DIi4EtyRl6Y78v7vFZ';
+
+% === Thresholds ===
+tempMin = 5;              
+tempMax = 30;            
+humMin = 30;             
+humMax = 70;              
+co2Max = 1000;            
+tvocMax = 150;            
+
+% === Read latest values from fields 1–4
+[data, ts] = thingSpeakRead(readChannelID, ...
+    'Fields', [1, 2, 3, 4], ...
+    'NumPoints', 1, ...
+    'ReadKey', readAPIKey);
+
+% Parse values
+temp = data(1);
+hum = data(2);
+co2 = data(3);
+tvoc = data(4);
+
+fprintf('Latest Readings:\n  Temp: %.1f°C\n  Humidity: %.1f%%\n  CO2: %d ppm\n  TVOC: %d ppb\n', temp, hum, co2, tvoc);
+
+% === Check conditions and build alert message
+alerts = {};
+
+% Temperature outside 5–30°C
+if ~isempty(temp)
+    if temp > tempMax
+        alerts{end+1} = sprintf('️ Temperature too high: %.1f°C', temp);
+    elseif temp < tempMin
+        alerts{end+1} = sprintf(' Temperature too low: %.1f°C', temp);
+    end
+end
+
+% Humidity outside 30–70%
+if ~isempty(hum)
+    if hum < humMin
+        alerts{end+1} = sprintf(' Humidity too low: %.1f%%', hum);
+    elseif hum > humMax
+        alerts{end+1} = sprintf(' Humidity too high: %.1f%%', hum);
+    end
+end
+
+% CO2 above threshold
+if ~isempty(co2) && co2 > co2Max
+    alerts{end+1} = sprintf(' CO2 too high: %d ppm', co2);
+end
+
+% TVOC above threshold
+if ~isempty(tvoc) && tvoc > tvocMax
+    alerts{end+1} = sprintf(' TVOC too high: %d ppb', tvoc);
+end
+
+% === Send email alert if any issues found
+if ~isempty(alerts)
+    message = strjoin(alerts, '\n');
+
+    url = sprintf('https://maker.ifttt.com/trigger/high_temp_alert/with/key/%s?value1=%s', ...
+                  iftttKey, urlencode(message));
+
+    fprintf(' Sending alert email via IFTTT...\n');
+    webread(url);
+else
+    fprintf(' All readings within safe ranges. No alert sent.\n');
+end
